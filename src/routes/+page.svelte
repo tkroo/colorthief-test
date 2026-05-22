@@ -1,11 +1,15 @@
 <script lang="ts">
-	import { getColorSync, getPaletteSync, getSwatchesSync, type Color } from 'colorthief';
+	import { getColorSync, getPaletteSync, getSwatchesSync, createColor, type Color } from 'colorthief';
+  import 'eyedropper-polyfill';
+  import EyeDropperIcon from '$lib/assets/eyedropper-svgrepo-com.svg';
 
 	let imageUrl = $state('');
 	let isDragging = $state(false);
 	let colorPalette = $state([]);
-	let numberOfColors = $state(6);
+	let numOfColors = $state(6);
 
+  let eyedropColor = $state(createColor(255, 255, 255, 1));
+  let eyedropPicked = $state(false);
 	let dominantColor = $state('');
 	let semanticSwatches = $state({});
 
@@ -19,16 +23,16 @@
 		'LightMuted'
 	];
 
-	function handleDragOver(e: DragEvent) {
+	function handleDragOver(e: DragEvent): void {
 		e.preventDefault();
 		isDragging = true;
 	}
 
-	function handleDragLeave() {
+	function handleDragLeave(): void {
 		isDragging = false;
 	}
 
-	function processFile(file: File) {
+	function processFile(file: File): void {
 		if (file.type.startsWith('image/')) {
 			const reader = new FileReader();
 			reader.onload = (event) => {
@@ -102,7 +106,7 @@
 		img.crossOrigin = 'Anonymous';
 		img.onload = () => {
 			try {
-				const palette = getPaletteSync(img, { colorCount: numberOfColors, quality: 10 });
+				const palette = getPaletteSync(img, { colorCount: numOfColors, quality: 10 });
 				const dominant = getColorSync(img);
 				const semantic = getSwatchesSync(img);
 				if (palette) {
@@ -120,6 +124,31 @@
 		};
 		img.src = imageUrl;
 	}
+
+  function hexToRgbBitwise(hex) {
+    // Convert hex to a number (0x notation)
+    const num = parseInt(hex.replace(/^#/, ''), 16);
+
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
+
+  function OpenEye() {
+      const eyeDropper = new window.EyeDropper();
+
+      eyeDropper.open()
+      .then((colorSelectionResult) => {
+          // Use the selected color information
+          console.log('Selected color:', colorSelectionResult.sRGBHex);
+          const rgb = hexToRgbBitwise(colorSelectionResult.sRGBHex);
+          console.log('rgb', rgb)
+          eyedropColor = createColor(rgb[0],rgb[1],rgb[2], 1);
+          eyedropPicked = true;
+        })
+      .catch((error) => {
+          console.error('Error:', error)
+        })
+    }
+
 </script>
 
 {#snippet clickableThing(content)}
@@ -207,13 +236,22 @@
 
 	<label for="numOfColors"
 		>How many palette colors?
-		<input type="number" id="numOfColors" min="2" max="20" bind:value={numberOfColors} />
+		<input type="number" id="numOfColors" min="2" max="20" bind:value={numOfColors} />
 	</label>
 
 	{#if imageUrl}
 		<div class="result-container">
 			<div class="image-container">
 				<h2>Image</h2>
+        <div class="eyedropwrap">
+        <button onclick={OpenEye}><img class="eyedroppericon" src={EyeDropperIcon} alt="eyedropper icon"/></button>
+        
+
+        {#if eyedropPicked}
+        {@render colorSwatch({ color: eyedropColor })}
+        {/if}
+        <!-- <div style="width:2rem, height:2rem;">{JSON.stringify(eyedropColor)}</div> -->
+        </div>
 				<img src={imageUrl} alt="Uploaded" />
 				{@render proportionBar(colorPalette)}
 			</div>
@@ -246,3 +284,9 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+.eyedroppericon {
+    width: 3rem;
+  }
+</style>
